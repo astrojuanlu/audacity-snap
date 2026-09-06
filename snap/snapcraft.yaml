@@ -47,54 +47,26 @@ plugs:
 
 apps:
   audacity:
-    extensions: [kde-neon-qt6]
+    extensions: [kde-neon-6]
     command: usr/bin/audacity
-    command-chain:
-    - snap/command-chain/qt6-override
     desktop: usr/share/applications/org.audacityteam.Audacity.desktop
     common-id: org.audacityteam.Audacity
     plugs:
       - alsa
+      - audio-playback
       - audio-record
       - home
       - jack1
+      - network
+      - network-bind
       - pulseaudio
       - removable-media
     environment:
-      LD_LIBRARY_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR:$SNAP/usr/lib:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/audacity:$SNAP/ffmpeg-platform/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR
+      LD_LIBRARY_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/audacity:$SNAP/ffmpeg-platform/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR
       PATH: $SNAP/ffmpeg-platform/usr/bin:$PATH
-      QT_PLUGIN_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/qt6/plugins
-      QML2_IMPORT_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/qt6/qml
-      QT_QPA_PLATFORM: xcb
 
 parts:
-  qt6-runtime:
-    plugin: nil
-    build-snaps:
-      - kde-qt6-core24-sdk
-    override-build: |
-      set -eux
-      mkdir -p $CRAFT_PART_INSTALL/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR
-      mkdir -p $CRAFT_PART_INSTALL/usr/lib
-      # Copy Qt6 runtime libraries from the SDK snap (matching build version)
-      cp -a /snap/kde-qt6-core24-sdk/current/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/libQt6*.so* $CRAFT_PART_INSTALL/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/ 2>/dev/null || true
-      cp -a /snap/kde-qt6-core24-sdk/current/usr/lib/libQt6*.so* $CRAFT_PART_INSTALL/usr/lib/ 2>/dev/null || true
-      # Copy Qt6 plugins and QML modules
-      cp -a /snap/kde-qt6-core24-sdk/current/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/qt6 $CRAFT_PART_INSTALL/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/ 2>/dev/null || true
-      cp -a /snap/kde-qt6-core24-sdk/current/usr/share/qt6 $CRAFT_PART_INSTALL/usr/share/ 2>/dev/null || true
-      # Remove build-only files
-      find $CRAFT_PART_INSTALL -name "*.prl" -delete 2>/dev/null || true
-      # Create command-chain script that overrides the content snap's Qt6 with our staged version
-      mkdir -p $CRAFT_PART_INSTALL/snap/command-chain
-      printf '#!/bin/bash\nexport LD_LIBRARY_PATH="$SNAP/usr/lib/x86_64-linux-gnu:$SNAP/usr/lib:$LD_LIBRARY_PATH"\nexport QT_PLUGIN_PATH="$SNAP/usr/lib/x86_64-linux-gnu/qt6/plugins"\nexport QML2_IMPORT_PATH="$SNAP/usr/lib/x86_64-linux-gnu/qt6/qml"\n' > $CRAFT_PART_INSTALL/snap/command-chain/qt6-override
-      chmod +x $CRAFT_PART_INSTALL/snap/command-chain/qt6-override
-    prime:
-      - -usr/include
-      - -usr/share/doc
-
   audacity:
-    after:
-      - qt6-runtime
     plugin: cmake
     source: https://github.com/audacity/audacity.git
     source-tag: Audacity-$SNAPCRAFT_PROJECT_VERSION
@@ -217,8 +189,6 @@ parts:
         -DAU_USE_SOUNDTOUCH=On
       cmake --build $CRAFT_PART_BUILD -- -j$CRAFT_PARALLEL_BUILD_COUNT
       DESTDIR=$CRAFT_PART_INSTALL cmake --install $CRAFT_PART_BUILD
-      # Fix rpath: remove hardcoded SDK snap path, use $ORIGIN-relative path
-      patchelf --set-rpath '$ORIGIN/../lib:$ORIGIN/../lib/x86_64-linux-gnu' $CRAFT_PART_INSTALL/usr/bin/audacity
     build-packages:
       - build-essential
       - cmake
